@@ -54,9 +54,10 @@ curl -fsSL https://storage.googleapis.com/git-repo-downloads/repo > "$HOME/bin/r
 chmod +x "$HOME/bin/repo"
 export PATH="$HOME/bin:$PATH"
 
-# repo init + sync
-mkdir -p "$KSRC"
-cd "$KSRC"
+# Sync into $KSRC.workspace so kernel source ends up at $KSRC.workspace/common, then point $KSRC at it.
+KSRC_WORKSPACE="${KSRC}.workspace"
+mkdir -p "$KSRC_WORKSPACE"
+cd "$KSRC_WORKSPACE"
 git config --global user.email "build@build.local"
 git config --global user.name "kernel-builder"
 
@@ -65,8 +66,6 @@ REPO_TRY=1
 while [ $REPO_TRY -le $REPO_RETRIES ]; do
   if repo init --depth=1 -u https://android.googlesource.com/kernel/manifest -b "common-${LTS_BRANCH}" 2>&1; then
     # Handle Google moving old LTS branches under deprecated/ — like WildKernels' action does.
-    # ls-remote fuzzy-matches the branch name to refs ending with it, so deprecated/<branch>
-    # will appear in the output. Detect via grep.
     REMOTE_BRANCH=$(git ls-remote https://android.googlesource.com/kernel/common "$LTS_BRANCH" || true)
     if grep -q deprecated <<< "$REMOTE_BRANCH"; then
       log "Branch $LTS_BRANCH is deprecated, rewriting manifest to deprecated/${LTS_BRANCH}"
@@ -85,14 +84,15 @@ while [ $REPO_TRY -le $REPO_RETRIES ]; do
   fi
 done
 
-# After repo sync, kernel source ends up in $KSRC/common
-if [ -d "$KSRC/common" ]; then
-  # Move common/* up to $KSRC for compatibility with rest of build.sh
-  shopt -s dotglob
-  mv "$KSRC/common/"* "$KSRC/" 2>/dev/null || true
-  rmdir "$KSRC/common" 2>/dev/null || true
-  shopt -u dotglob
+# Point $KSRC at the actual kernel/common directory (which contains arch/, kernel/, drivers/, etc.)
+if [ ! -d "$KSRC_WORKSPACE/common" ]; then
+  echo "[ERROR] $KSRC_WORKSPACE/common not found after repo sync. Contents of workspace:"
+  ls -la "$KSRC_WORKSPACE"
+  exit 1
 fi
+rm -rf "$KSRC"
+ln -s "$KSRC_WORKSPACE/common" "$KSRC"
+log "Kernel source at $KSRC -> $(readlink $KSRC). kernelversion: $(make -s -C $KSRC kernelversion 2>/dev/null || echo unknown)"
 
 cd "$WORKDIR"
 
