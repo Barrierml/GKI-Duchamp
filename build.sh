@@ -275,10 +275,10 @@ cp "$KERNEL_IMAGE" .
 zip -r9 "$WORKDIR/$AK3_ZIP_NAME" ./*
 cd $OLDPWD
 
+mkdir -p $RELEASE_DIR
+mv $WORKDIR/*.zip $RELEASE_DIR
 if [ "$STATUS" != "BETA" ]; then
   echo "BASE_NAME=$KERNEL_NAME-$VARIANT" >> $GITHUB_ENV
-  mkdir -p $RELEASE_DIR
-  mv $WORKDIR/*.zip $RELEASE_DIR
 fi
 
 if [ "$STATUS" != "BETA" ]; then
