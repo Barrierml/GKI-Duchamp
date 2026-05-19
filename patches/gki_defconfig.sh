@@ -35,70 +35,27 @@ EOF
 
 fi
 
-echo "⚙️ Skipping ahmed's perf tuning block (targets 6.1.173, breaks on 6.1.57 LTS). Only docker block below."
+echo "⚙️ Skipping ahmed's perf tuning block."
 
-echo "🐳 Adding Docker required configs"
-cat >> $DEFCONFIG <<EOF
-# --- Docker required configs ---
-# Namespaces
+# Docker block bisect — temporarily disabled for boot-test isolation.
+# If base SKSU+6.1.57 boots, the docker block is the KMI-breaking change.
+# If base also panics, the issue is SukiSU integration or our toolchain.
+if [ "${ENABLE_DOCKER_CONFIG:-false}" = "true" ]; then
+  echo "🐳 Adding Docker required configs"
+  cat >> $DEFCONFIG <<EOF
 CONFIG_NAMESPACES=y
-CONFIG_UTS_NS=y
-CONFIG_IPC_NS=y
-CONFIG_PID_NS=y
 CONFIG_USER_NS=y
-CONFIG_NET_NS=y
-CONFIG_CGROUPS=y
-CONFIG_POSIX_MQUEUE=y
-# Cgroups
-CONFIG_CGROUP_DEVICE=y
-CONFIG_CGROUP_PIDS=y
-CONFIG_CGROUP_HUGETLB=y
-CONFIG_CGROUP_FREEZER=y
-CONFIG_CGROUP_CPUACCT=y
-CONFIG_CGROUP_NET_PRIO=y
-CONFIG_CGROUP_PERF=y
-CONFIG_MEMCG=y
-CONFIG_BLK_CGROUP=y
-CONFIG_CFS_BANDWIDTH=y
-# Storage drivers (overlayfs is docker default)
+CONFIG_PID_NS=y
 CONFIG_OVERLAY_FS=y
-CONFIG_BLK_DEV_DM=y
-CONFIG_DM_THIN_PROVISIONING=y
-CONFIG_SQUASHFS=y
-# Networking — bridge/veth/vxlan/macvlan/ipvlan for container networks
-CONFIG_BRIDGE=y
 CONFIG_BRIDGE_NETFILTER=y
 CONFIG_VETH=y
 CONFIG_VXLAN=y
 CONFIG_MACVLAN=y
 CONFIG_IPVLAN=y
-CONFIG_DUMMY=y
-# Netfilter — docker iptables/nftables rules
-CONFIG_NF_NAT=y
-CONFIG_IP_NF_NAT=y
-CONFIG_IP_NF_TARGET_MASQUERADE=y
-CONFIG_NETFILTER_XTABLES=y
-CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y
-CONFIG_NETFILTER_XT_MATCH_CONNTRACK=y
-CONFIG_NETFILTER_XT_MATCH_IPVS=y
-CONFIG_NETFILTER_XT_TARGET_REDIRECT=y
-CONFIG_NETFILTER_NETLINK=y
-CONFIG_NF_CONNTRACK=y
-CONFIG_NF_CONNTRACK_NETLINK=y
 CONFIG_NF_TABLES=y
-CONFIG_NF_TABLES_INET=y
-CONFIG_NF_TABLES_IPV4=y
-CONFIG_NF_TABLES_IPV6=y
-CONFIG_NFT_COUNTER=y
-CONFIG_NFT_COMPAT=y
-CONFIG_NFT_NAT=y
-# IP Virtual Server (docker swarm mode)
-CONFIG_IP_VS=y
-CONFIG_IP_VS_NFCT=y
-CONFIG_IP_VS_RR=y
-# Misc
-CONFIG_KEYS=y
-CONFIG_SECCOMP=y
-CONFIG_SECCOMP_FILTER=y
+CONFIG_CGROUP_DEVICE=y
+CONFIG_CGROUP_PIDS=y
+CONFIG_POSIX_MQUEUE=y
 CONFIG_CHECKPOINT_RESTORE=y
 EOF
+fi
