@@ -64,10 +64,12 @@ REPO_RETRIES=3
 REPO_TRY=1
 while [ $REPO_TRY -le $REPO_RETRIES ]; do
   if repo init --depth=1 -u https://android.googlesource.com/kernel/manifest -b "common-${LTS_BRANCH}" 2>&1; then
-    # Handle Google moving old LTS branches under deprecated/ — like WildKernels' action does
+    # Handle Google moving old LTS branches under deprecated/ — like WildKernels' action does.
+    # ls-remote fuzzy-matches the branch name to refs ending with it, so deprecated/<branch>
+    # will appear in the output. Detect via grep.
     REMOTE_BRANCH=$(git ls-remote https://android.googlesource.com/kernel/common "$LTS_BRANCH" || true)
-    if [ -z "$REMOTE_BRANCH" ]; then
-      log "Branch $LTS_BRANCH not found at HEAD, trying deprecated/${LTS_BRANCH}"
+    if grep -q deprecated <<< "$REMOTE_BRANCH"; then
+      log "Branch $LTS_BRANCH is deprecated, rewriting manifest to deprecated/${LTS_BRANCH}"
       DEFAULT_MANIFEST_PATH=.repo/manifests/default.xml
       sed -i "s|\"${LTS_BRANCH}\"|\"deprecated/${LTS_BRANCH}\"|g" "$DEFAULT_MANIFEST_PATH"
     fi
