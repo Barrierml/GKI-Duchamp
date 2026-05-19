@@ -43,9 +43,49 @@ trap 'echo "!!! ERROR at line $LINENO: [[$BASH_COMMAND]]" >> "$BUILD_LOGS"' ERR
 trap 'echo "!!! Received SIGTERM at $(date) - possible GitHub kill" >> "$BUILD_LOGS"' TERM
 trap 'echo "!!! Received SIGINT at $(date)" >> "$BUILD_LOGS"' INT
 
-# Clone kernel source
-log "Cloning kernel source from $(simplify_gh_url "$KERNEL_REPO")"
-git clone -q --depth=1 "$KERNEL_REPO" -b "$KERNEL_BRANCH" "$KSRC"
+# Clone kernel source — use repo init/sync to pin to specific LTS (matches vendor module ABI)
+# LTS_BRANCH controls which LTS snapshot is fetched. android14-6.1-2024-01 → 6.1.57 LTS.
+LTS_BRANCH="${LTS_BRANCH:-android14-6.1-2024-01}"
+log "Initializing kernel source via repo (manifest branch: common-${LTS_BRANCH})"
+
+# Install repo tool
+mkdir -p "$HOME/bin"
+curl -fsSL https://storage.googleapis.com/git-repo-downloads/repo > "$HOME/bin/repo"
+chmod +x "$HOME/bin/repo"
+export PATH="$HOME/bin:$PATH"
+
+# repo init + sync
+mkdir -p "$KSRC"
+cd "$KSRC"
+git config --global user.email "build@build.local"
+git config --global user.name "kernel-builder"
+
+REPO_RETRIES=3
+REPO_TRY=1
+while [ $REPO_TRY -le $REPO_RETRIES ]; do
+  if repo init --depth=1 -u https://android.googlesource.com/kernel/manifest -b "common-${LTS_BRANCH}" 2>&1; then
+    if timeout 15m repo sync -c -j$(nproc) --no-tags --no-clone-bundle --optimized-fetch --retry-fetches=3 --force-sync 2>&1; then
+      break
+    fi
+  fi
+  REPO_TRY=$((REPO_TRY + 1))
+  if [ $REPO_TRY -le $REPO_RETRIES ]; then
+    log "repo init/sync attempt failed, retrying ($REPO_TRY/$REPO_RETRIES)"
+    sleep 15
+    rm -rf .repo 2>/dev/null || true
+  fi
+done
+
+# After repo sync, kernel source ends up in $KSRC/common
+if [ -d "$KSRC/common" ]; then
+  # Move common/* up to $KSRC for compatibility with rest of build.sh
+  shopt -s dotglob
+  mv "$KSRC/common/"* "$KSRC/" 2>/dev/null || true
+  rmdir "$KSRC/common" 2>/dev/null || true
+  shopt -u dotglob
+fi
+
+cd "$WORKDIR"
 
 cd $KSRC
 LINUX_VERSION=$(make kernelversion)
